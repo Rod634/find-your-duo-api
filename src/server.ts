@@ -1,7 +1,12 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client'
+import { convertHoursToMinutesString, convertMinutesToHoursString } from './Utils/hourUtil';
+import cors from 'cors'
 
 const app = express();
+app.use(express.json());
+
+app.use(cors())
 
 const prisma = new PrismaClient({});
 
@@ -10,7 +15,7 @@ const prisma = new PrismaClient({});
 app.get('/games', async (req, res) => {
     const games = await prisma.game.findMany({
         include: {
-            _count:{
+            _count: {
                 select: {
                     ads: true
                 }
@@ -20,9 +25,9 @@ app.get('/games', async (req, res) => {
     return res.status(200).json(games);
 });
 
-app.get('/games/:id/ads', async (req, res) =>{
+app.get('/games/:id/ads', async (req, res) => {
     const gameId = req.params.id;
-    
+
     const ads = await prisma.ad.findMany({
         select: {
             id: true,
@@ -42,23 +47,38 @@ app.get('/games/:id/ads', async (req, res) =>{
     })
 
 
-    return res.json(ads.map(ad =>{
-        return{
+    return res.json(ads.map(ad => {
+        return {
             ...ad,
-            weekDays: ad.weekDays.split(',')
+            weekDays: ad.weekDays.split(','),
+            hourStart: convertMinutesToHoursString(ad.hourStart),
+            hourEnd: convertMinutesToHoursString(ad.hourEnd)
+
         }
     }));
 });
 
+app.post('/games/:id/ads', async (req, res) => {
+    const gameId = req.params.id;
+    const body = req.body;
+
+    const ad = await prisma.ad.create({
+        data:{
+            gameId,
+            name: body.name,
+            yearsPlaying: body.yearsPlaying,
+            discord: body.discord,
+            weekDays: body.weekDays.join(','),
+            hourStart: convertHoursToMinutesString(body.hourStart),
+            hourEnd: convertHoursToMinutesString(body.hourEnd),
+            useVoiceChannel: body.useVoiceChannel,
+        }
+    })
+
+    return res.status(201).json(body)
+});
+
 //Ads controller
-
-app.get('/ads', (req, res) =>{
-    return res.json();
-});
-
-app.post('/ads', (req, res) => {
-    return res.status(201).json()
-});
 
 app.get('/ads/:id/discord', async (req, res) => {
     const adsId = req.params.id;
